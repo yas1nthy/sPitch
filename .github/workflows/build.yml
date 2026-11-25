@@ -1,0 +1,41 @@
+
+name: Build sPitch Windows Installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Download project
+        uses: actions/checkout@v4
+
+      - name: Extract project
+        shell: pwsh
+        run: |
+          Expand-Archive `
+            -Path sPitch-windows-build-kit.zip `
+            -DestinationPath .
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+
+      - name: Build VST3 and Installer
+        shell: cmd
+        run: |
+          cd sPitch
+          build-windows.bat
+
+      - name: Upload EXE installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: sPitch-Windows-Installer
+          path: sPitch/installer/Output/sPitch-Setup-0.1.0-x64.exe
+          if-no-files-found: error
