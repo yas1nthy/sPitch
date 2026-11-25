@@ -13,35 +13,56 @@ jobs:
 
     steps:
       - name: Download project
-        uses: actions/checkout@v4 
+        uses: actions/checkout@v4
+
       - name: Extract project
         shell: pwsh
         run: |
-          Expand-Archive `
-            -Path sPitch-windows-build-kit.zip `
-            -DestinationPath .
+          Expand-Archive -LiteralPath "sPitch-windows-build-kit.zip" -DestinationPath "." -Force
+          if (!(Test-Path "sPitch/CMakeLists.txt")) {
+            throw "Project CMakeLists.txt not found!"
+          }
+
+      - name: Generate JUCE header
+        shell: pwsh
+        run: |
+          $path = "sPitch/CMakeLists.txt"
+          $content = Get-Content $path -Raw
+          $marker = "target_sources(sPitch PRIVATE"
+          if (!$content.Contains("juce_generate_juce_header(sPitch)")) {
+            if (!$content.Contains($marker)) {
+              throw "Cannot find target_sources in CMakeLists.txt"
+            }
+            $content = $content.Replace(
+              $marker,
+              "juce_generate_juce_header(sPitch)`r`n`r`n$marker"
+            )
+            Set-Content -Path $path -Value $content -Encoding utf8
+          }
 
       - name: Install Inno Setup
         shell: pwsh
         run: |
           choco install innosetup -y --no-progress
- - name: Generate JUCE header
-        shell: pwsh
-        run: |
-          $path = "sPitch/CMakeLists.txt"
-          $content = Get-Content $path -Raw
-          $needle = "target_compile_definitions(sPitch PUBLIC"
-          if (-not $content.Contains($needle)) {
-            throw "Cannot find target_compile_definitions in CMakeLists.txt"
-          }
-          $replacement = "juce_generate_juce_header(sPitch)`r`n`r`n$needle"
-          $content = $content.Replace($needle, $replacement)
-          Set-Content -Path $path -Value $content -Encoding utf8
-      - name: Build VST3 and Installer
+
+      - name: Configure CMake
         shell: cmd
         run: |
-          cd sPitch
-          build-windows.bat
+          cmake -S sPitch -B sPitch/build -G "Visual Studio 17 2022" -A x64
+          if errorlevel 1 exit /b 1
+
+      - name: Compile VST3
+        shell: cmd
+        run: |
+          cmake --build sPitch/build --config Release --target sPitch_VST3 sPitch_Standalone --parallel
+          if errorlevel 1 exit /b 1
+
+      - name: Create EXE Installer
+        shell: cmd
+        working-directory: sPitch
+        run: |
+          "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" installer\sPitch.iss
+          if errorlevel 1 exit /b 1
 
       - name: Upload EXE installer
         uses: actions/upload-artifact@v4
