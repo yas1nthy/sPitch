@@ -13,21 +13,7 @@ jobs:
 
     steps:
       - name: Download project
-        uses: actions/checkout@v4
-
-      - name: Generate JUCE header
-        shell: pwsh
-        run: |
-          $path = "sPitch/CMakeLists.txt"
-          $content = Get-Content $path -Raw
-          $needle = "target_compile_definitions(sPitch PUBLIC"
-          if (-not $content.Contains($needle)) {
-            throw "Cannot find target_compile_definitions in CMakeLists.txt"
-          }
-          $replacement = "juce_generate_juce_header(sPitch)`r`n`r`n$needle"
-          $content = $content.Replace($needle, $replacement)
-          Set-Content -Path $path -Value $content -Encoding utf8
-
+        uses: actions/checkout@v4 
       - name: Extract project
         shell: pwsh
         run: |
@@ -39,7 +25,18 @@ jobs:
         shell: pwsh
         run: |
           choco install innosetup -y --no-progress
-
+ - name: Generate JUCE header
+        shell: pwsh
+        run: |
+          $path = "sPitch/CMakeLists.txt"
+          $content = Get-Content $path -Raw
+          $needle = "target_compile_definitions(sPitch PUBLIC"
+          if (-not $content.Contains($needle)) {
+            throw "Cannot find target_compile_definitions in CMakeLists.txt"
+          }
+          $replacement = "juce_generate_juce_header(sPitch)`r`n`r`n$needle"
+          $content = $content.Replace($needle, $replacement)
+          Set-Content -Path $path -Value $content -Encoding utf8
       - name: Build VST3 and Installer
         shell: cmd
         run: |
